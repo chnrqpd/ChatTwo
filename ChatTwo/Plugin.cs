@@ -59,6 +59,7 @@ public sealed class Plugin : IDalamudPlugin
     internal ExtraChat ExtraChat { get; }
     internal TypingIpc TypingIpc { get; }
     internal FontManager FontManager { get; }
+    internal TranslationBridge Translation { get; }
 
     internal ServerCore ServerCore { get; }
 
@@ -102,6 +103,7 @@ public sealed class Plugin : IDalamudPlugin
             TypingIpc = new TypingIpc(this);
             ExtraChat = new ExtraChat(this);
             FontManager = new FontManager();
+            Translation = new TranslationBridge(this);
 
             ChatLogWindow = new ChatLogWindow(this);
             SettingsWindow = new SettingsWindow(this);

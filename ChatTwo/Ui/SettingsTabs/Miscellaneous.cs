@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ChatTwo.Resources;
 using ChatTwo.Util;
 using Dalamud.Bindings.ImGui;
@@ -6,6 +7,9 @@ namespace ChatTwo.Ui.SettingsTabs;
 
 internal sealed class Miscellaneous(Configuration mutable) : ISettingsTab
 {
+    private const int LanguageTagMaxLength = 32;
+    private static readonly Regex LanguageTagRegex = new("^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$", RegexOptions.Compiled);
+
     private Configuration Mutable { get; } = mutable;
     public string Name => Language.Options_Miscellaneous_Tab + "###tabs-miscellaneous";
 
@@ -58,5 +62,36 @@ internal sealed class Miscellaneous(Configuration mutable) : ISettingsTab
         ImGui.Checkbox(Language.Options_SortAutoTranslate_Name, ref Mutable.SortAutoTranslate);
         ImGuiUtil.HelpText(Language.Options_SortAutoTranslate_Description);
         ImGui.Spacing();
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("AI Translation");
+        ImGuiUtil.HelpText("Route chat text through an AI translator exposed via Dalamud IPC.");
+
+        ImGui.Checkbox("Enable translation features", ref Mutable.TranslationEnabled);
+        ImGui.Checkbox("Translate incoming chat to target language", ref Mutable.TranslateIncoming);
+        var incomingValid = LooksLikeLanguageTag(Mutable.TranslationIncomingLanguage);
+        ImGui.InputText("Incoming target language (e.g. pt-BR)", ref Mutable.TranslationIncomingLanguage, LanguageTagMaxLength);
+        if (!incomingValid)
+            ImGuiUtil.HelpText("Use a BCP-47 language tag such as en or pt-BR.");
+
+        ImGui.Checkbox("Translate outgoing chat to target language", ref Mutable.TranslateOutgoing);
+        var outgoingValid = LooksLikeLanguageTag(Mutable.TranslationOutgoingLanguage);
+        ImGui.InputText("Outgoing target language (e.g. en)", ref Mutable.TranslationOutgoingLanguage, LanguageTagMaxLength);
+        if (!outgoingValid)
+            ImGuiUtil.HelpText("Use a BCP-47 language tag such as en or pt-BR.");
+
+        ImGui.InputText("Translation IPC channel name", ref Mutable.TranslationIpcName, 64);
+        ImGuiUtil.HelpText("IPC must accept (string text, string sourceLanguage, string targetLanguage) and return translated text.");
+    }
+
+    private static bool LooksLikeLanguageTag(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        if (value.Length > LanguageTagMaxLength)
+            return false;
+
+        return LanguageTagRegex.IsMatch(value);
     }
 }

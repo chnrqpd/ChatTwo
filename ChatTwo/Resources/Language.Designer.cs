@@ -105,6 +105,15 @@ namespace ChatTwo.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Translated.
+        /// </summary>
+        internal static string ChatLog_Translated_Label {
+            get {
+                return ResourceManager.GetString("ChatLog_Translated_Label", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Disabled for this tab..
         /// </summary>
         internal static string ChatLog_SwitcherDisabled {

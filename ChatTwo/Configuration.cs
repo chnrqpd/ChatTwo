@@ -78,6 +78,12 @@ internal class Configuration : IPluginConfiguration
     public bool KeepInputFocus = true;
     public int MaxLinesToRender = 10_000; // 1-10000
     public bool Use24HourClock;
+    public bool TranslationEnabled;
+    public bool TranslateIncoming;
+    public string TranslationIncomingLanguage = "en";
+    public bool TranslateOutgoing;
+    public string TranslationOutgoingLanguage = "en";
+    public string TranslationIpcName = "ChatTwo.TranslateText";
 
     public bool ShowEmotes = true;
     public HashSet<string> BlockedEmotes = [];
@@ -169,6 +175,12 @@ internal class Configuration : IPluginConfiguration
         KeepInputFocus = other.KeepInputFocus;
         MaxLinesToRender = other.MaxLinesToRender;
         Use24HourClock = other.Use24HourClock;
+        TranslationEnabled = other.TranslationEnabled;
+        TranslateIncoming = other.TranslateIncoming;
+        TranslationIncomingLanguage = other.TranslationIncomingLanguage;
+        TranslateOutgoing = other.TranslateOutgoing;
+        TranslationOutgoingLanguage = other.TranslationOutgoingLanguage;
+        TranslationIpcName = other.TranslationIpcName;
         ShowEmotes = other.ShowEmotes;
         BlockedEmotes = other.BlockedEmotes;
         FontsEnabled = other.FontsEnabled;
