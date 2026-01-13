@@ -60,6 +60,7 @@ public sealed class Plugin : IDalamudPlugin
     internal TypingIpc TypingIpc { get; }
     internal FontManager FontManager { get; }
     internal TranslationBridge Translation { get; }
+    internal TranslationIpcProvider TranslationIpcProvider { get; }
 
     internal ServerCore ServerCore { get; }
 
@@ -104,6 +105,7 @@ public sealed class Plugin : IDalamudPlugin
             ExtraChat = new ExtraChat(this);
             FontManager = new FontManager();
             Translation = new TranslationBridge(this);
+            TranslationIpcProvider = new TranslationIpcProvider(this);
 
             ChatLogWindow = new ChatLogWindow(this);
             SettingsWindow = new SettingsWindow(this);
@@ -187,6 +189,7 @@ public sealed class Plugin : IDalamudPlugin
         SeStringDebugger?.Dispose();
 
         TypingIpc?.Dispose();
+        TranslationIpcProvider?.Dispose();
         ExtraChat?.Dispose();
         Ipc?.Dispose();
         MessageManager?.DisposeAsync().AsTask().Wait();
