@@ -1226,9 +1226,10 @@ public sealed class ChatLogWindow : Window
                 if (!string.IsNullOrWhiteSpace(message.TranslationText))
                 {
                     ImGui.NewLine();
+                    var baseLabel = Language.ChatLog_Translated_Label;
                     var label = string.IsNullOrWhiteSpace(message.TranslationLanguage)
-                        ? "Translated"
-                        : $"Translated ({message.TranslationLanguage})";
+                        ? baseLabel
+                        : $"{baseLabel} ({message.TranslationLanguage})";
                     DrawChunks(
                         [new TextChunk(ChunkSource.Content, null, $"{label}: {message.TranslationText}") { FallbackColour = ChatType.System, Italic = true }],
                         true,

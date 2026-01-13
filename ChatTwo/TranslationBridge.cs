@@ -1,4 +1,6 @@
 using System;
+using System.Threading.Tasks;
+using Dalamud.Game;
 using Dalamud.Plugin.Ipc;
 
 namespace ChatTwo;
@@ -8,10 +10,39 @@ internal sealed class TranslationBridge
     private readonly Plugin Plugin;
     private ICallGateSubscriber<string, string, string, string?>? TranslateSubscriber;
     private string? CachedIpcName;
+    private static readonly TimeSpan OutgoingTimeout = TimeSpan.FromSeconds(2);
 
     internal TranslationBridge(Plugin plugin)
     {
         Plugin = plugin;
+    }
+
+    private static bool IsLikelyCommand(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return true;
+
+        return text[0] is '/' or '!';
+    }
+
+    private static string ToBcp47(ClientLanguage language) => language switch
+    {
+        ClientLanguage.Japanese => "ja",
+        ClientLanguage.German => "de",
+        ClientLanguage.French => "fr",
+        ClientLanguage.ChineseSimplified => "zh-Hans",
+        ClientLanguage.ChineseTraditional => "zh-Hant",
+        ClientLanguage.Korean => "ko",
+        _ => "en",
+    };
+
+    private string ResolveIncomingLanguage()
+    {
+        if (!string.IsNullOrWhiteSpace(Plugin.Config.TranslationIncomingLanguage))
+            return Plugin.Config.TranslationIncomingLanguage;
+
+        var uiLanguage = Plugin.Interface.UiLanguage;
+        return ToBcp47(uiLanguage);
     }
 
     private ICallGateSubscriber<string, string, string, string?>? GetSubscriber()
@@ -67,15 +98,23 @@ internal sealed class TranslationBridge
         if (string.IsNullOrWhiteSpace(text))
             return;
 
-        var target = string.IsNullOrWhiteSpace(Plugin.Config.TranslationIncomingLanguage)
-            ? Plugin.Interface.UiLanguage
-            : Plugin.Config.TranslationIncomingLanguage;
+        var target = ResolveIncomingLanguage();
 
-        var translated = Translate(text, "auto", target);
-        if (string.IsNullOrWhiteSpace(translated) || translated.Equals(text, StringComparison.OrdinalIgnoreCase))
-            return;
+        Task.Run(() =>
+        {
+            try
+            {
+                var translated = Translate(text, "auto", target);
+                if (string.IsNullOrWhiteSpace(translated))
+                    return;
 
-        message.SetTranslation(translated, target);
+                message.SetTranslation(translated, target);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Warning(ex, "Translation failed for incoming message");
+            }
+        });
     }
 
     internal string TranslateOutgoing(string text)
@@ -83,14 +122,29 @@ internal sealed class TranslationBridge
         if (!Plugin.Config.TranslationEnabled || !Plugin.Config.TranslateOutgoing)
             return text;
 
-        if (text.StartsWith('/'))
+        if (IsLikelyCommand(text))
             return text;
 
         var target = string.IsNullOrWhiteSpace(Plugin.Config.TranslationOutgoingLanguage)
             ? "en"
             : Plugin.Config.TranslationOutgoingLanguage;
 
-        var translated = Translate(text, "auto", target);
+        var translationTask = Task.Run(() => Translate(text, "auto", target));
+        try
+        {
+            if (!translationTask.Wait(OutgoingTimeout))
+            {
+                Plugin.Log.Warning("Translation timed out for outgoing text");
+                return text;
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "Translation failed for outgoing text");
+            return text;
+        }
+
+        var translated = translationTask.Result;
         return string.IsNullOrWhiteSpace(translated) ? text : translated;
     }
 }

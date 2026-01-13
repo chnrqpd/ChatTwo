@@ -274,6 +274,9 @@
     <data name="ChatLog_HideChat">
         <value>Hide chat</value>
     </data>
+    <data name="ChatLog_Translated_Label">
+        <value>Translated</value>
+    </data>
     <data name="ChatLog_Tabs_MoveUp">
         <value>Move up</value>
     </data>
