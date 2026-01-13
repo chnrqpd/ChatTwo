@@ -58,5 +58,19 @@ internal sealed class Miscellaneous(Configuration mutable) : ISettingsTab
         ImGui.Checkbox(Language.Options_SortAutoTranslate_Name, ref Mutable.SortAutoTranslate);
         ImGuiUtil.HelpText(Language.Options_SortAutoTranslate_Description);
         ImGui.Spacing();
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("AI Translation");
+        ImGuiUtil.HelpText("Route chat text through an AI translator exposed via Dalamud IPC.");
+
+        ImGui.Checkbox("Enable translation features", ref Mutable.TranslationEnabled);
+        ImGui.Checkbox("Translate incoming chat to target language", ref Mutable.TranslateIncoming);
+        ImGui.InputText("Incoming target language (e.g. pt-BR)", ref Mutable.TranslationIncomingLanguage, 16);
+
+        ImGui.Checkbox("Translate outgoing chat to English", ref Mutable.TranslateOutgoing);
+        ImGui.InputText("Outgoing target language", ref Mutable.TranslationOutgoingLanguage, 16);
+
+        ImGui.InputText("Translation IPC channel name", ref Mutable.TranslationIpcName, 64);
+        ImGuiUtil.HelpText("IPC must accept (string text, string sourceLanguage, string targetLanguage) and return translated text.");
     }
 }

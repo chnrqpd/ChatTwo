@@ -925,6 +925,11 @@ public sealed class ChatLogWindow : Window
         ];
     }
 
+    private string TranslateOutgoingText(string text)
+    {
+        return Plugin.Translation.TranslateOutgoing(text);
+    }
+
     internal void SendChatBox(Tab activeTab)
     {
         if (!string.IsNullOrWhiteSpace(Chat))
@@ -932,6 +937,7 @@ public sealed class ChatLogWindow : Window
             var trimmed = Chat.Trim();
             AddBacklog(trimmed);
             InputBacklogIdx = -1;
+            trimmed = TranslateOutgoingText(trimmed);
 
             if (TellSpecial)
             {
@@ -1216,6 +1222,19 @@ public sealed class ChatLogWindow : Window
                     DrawChunks([new TextChunk(ChunkSource.Content, null, " ")], true, handler, lineWidth);
                 else
                     DrawChunks(message.Content, true, handler, lineWidth);
+
+                if (!string.IsNullOrWhiteSpace(message.TranslationText))
+                {
+                    ImGui.NewLine();
+                    var label = string.IsNullOrWhiteSpace(message.TranslationLanguage)
+                        ? "Translated"
+                        : $"Translated ({message.TranslationLanguage})";
+                    DrawChunks(
+                        [new TextChunk(ChunkSource.Content, null, $"{label}: {message.TranslationText}") { FallbackColour = ChatType.System, Italic = true }],
+                        true,
+                        handler,
+                        lineWidth);
+                }
 
                 message.IsVisible[tab.Identifier] = ImGui.IsItemVisible();
             }

@@ -127,3 +127,24 @@ public sealed class TypingIntegration {
 ```
 
 All integrations are called inside of an ImGui `BeginMenu`.
+
+# Translation Bridge IPC
+
+Chat 2 can delegate message translation to an external AI-powered plugin. This keeps
+the core plugin lightweight while letting translators manage API keys, prompts and
+model choices separately.
+
+- Enable the feature in **Settings → Miscellaneous → AI Translation** and configure
+  your target languages.
+- The translator plugin must expose an IPC provider (name configurable, default
+  `ChatTwo.TranslateText`) with the signature  
+  `(string text, string sourceLanguage, string targetLanguage) => string?`.
+  - `sourceLanguage` is usually `"auto"`.
+  - `targetLanguage` should be a BCP-47 code (for example `pt-BR` or `en`).
+- Chat 2 will call this IPC to translate incoming messages to the configured
+  language and will translate outgoing chat to the configured outgoing language
+  (English by default) before sending.
+
+Using a dedicated translation plugin via this IPC is the recommended approach for
+AI translation, as it allows you to fine tune prompts (including slang handling)
+without altering Chat 2's main code path.

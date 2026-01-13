@@ -72,6 +72,8 @@ internal partial class Message
 
     internal SortCode SortCode { get; }
     internal Guid ExtraChatChannel { get; }
+    internal string? TranslationText { get; private set; }
+    internal string? TranslationLanguage { get; private set; }
 
     // Not stored in the database:
     internal int Hash { get; }
@@ -117,6 +119,12 @@ internal partial class Message
 
         foreach (var chunk in sender.Concat(content))
             chunk.Message = this;
+    }
+
+    internal void SetTranslation(string translated, string language)
+    {
+        TranslationText = translated;
+        TranslationLanguage = language;
     }
 
     internal static Message FakeMessage(List<Chunk> content, ChatCode code)
