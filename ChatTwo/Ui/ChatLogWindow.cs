@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using ChatTwo.Code;
 using ChatTwo.GameFunctions;
 using ChatTwo.GameFunctions.Types;
@@ -53,6 +54,16 @@ public sealed class ChatLogWindow : Window
     private bool FixCursor;
     private int AutoCompleteSelection;
     private bool AutoCompleteShouldScroll;
+
+    private readonly record struct OutgoingMessageContext(
+        string OriginalText,
+        bool IsCommand,
+        bool TellSpecial,
+        InputChannel Channel,
+        InputChannel TempChannel,
+        bool UseTempChannel,
+        TellTarget? TellTarget,
+        TellTarget? TempTellTarget);
 
     // Used to detect channel changes for the webinterface
     public Chunk[] PreviousChannel = [];
@@ -925,85 +936,123 @@ public sealed class ChatLogWindow : Window
         ];
     }
 
-    private string TranslateOutgoingText(string text)
+    private OutgoingMessageContext CreateOutgoingContext(Tab activeTab, string originalText)
     {
-        return Plugin.Translation.TranslateOutgoing(text);
+        return new OutgoingMessageContext(
+            originalText,
+            originalText.StartsWith('/'),
+            TellSpecial,
+            activeTab.CurrentChannel.Channel,
+            activeTab.CurrentChannel.TempChannel,
+            activeTab.CurrentChannel.UseTempChannel,
+            activeTab.CurrentChannel.TellTarget,
+            activeTab.CurrentChannel.TempTellTarget);
+    }
+
+    private async Task<string> TranslateOutgoingTextAsync(string text)
+    {
+        Plugin.Log.Info($"TranslateOutgoingText called with: '{text}'");
+        var result = await Plugin.Translation.TranslateOutgoingAsync(text).ConfigureAwait(false);
+        Plugin.Log.Info($"TranslateOutgoingText result: '{result}'");
+        return result;
+    }
+
+    private void SendMessageToGame(string text, OutgoingMessageContext context)
+    {
+        var trimmed = text;
+
+        if (context.TellSpecial)
+        {
+            var tellBytes = Encoding.UTF8.GetBytes(trimmed);
+            AutoTranslate.ReplaceWithPayload(ref tellBytes);
+            Plugin.Functions.Chat.SendTellUsingCommandInner(tellBytes);
+            return;
+        }
+
+        if (!context.IsCommand)
+        {
+            var target = context.TempTellTarget ?? context.TellTarget;
+            if (target != null)
+            {
+                if (target.ContentId == 0)
+                {
+                    trimmed = $"/tell {target.ToTargetString()} {trimmed}";
+                    var tellBytes = Encoding.UTF8.GetBytes(trimmed);
+                    AutoTranslate.ReplaceWithPayload(ref tellBytes);
+                    ChatBox.SendMessageUnsafe(tellBytes);
+                    return;
+                }
+
+                var reason = target.Reason;
+                var world = Sheets.WorldSheet.GetRow(target.World);
+                if (world is { IsPublic: true })
+                {
+                    if (reason == TellReason.Reply && GameFunctions.GameFunctions.GetFriends().Any(friend => friend.ContentId == target.ContentId))
+                        reason = TellReason.Friend;
+
+                    var tellBytes = Encoding.UTF8.GetBytes(trimmed);
+                    AutoTranslate.ReplaceWithPayload(ref tellBytes);
+                    Plugin.Functions.Chat.SendTell(reason, target.ContentId, target.Name, (ushort) world.RowId, tellBytes, trimmed);
+                }
+                return;
+            }
+
+            var channel = context.UseTempChannel ? context.TempChannel : context.Channel;
+            trimmed = $"{channel.Prefix()} {trimmed}";
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(trimmed);
+        AutoTranslate.ReplaceWithPayload(ref bytes);
+        ChatBox.SendMessageUnsafe(bytes);
     }
 
     internal void SendChatBox(Tab activeTab)
     {
-        if (!string.IsNullOrWhiteSpace(Chat))
+        if (string.IsNullOrWhiteSpace(Chat))
         {
-            var trimmed = Chat.Trim();
-            AddBacklog(trimmed);
-            InputBacklogIdx = -1;
-            trimmed = TranslateOutgoingText(trimmed);
-
-            if (TellSpecial)
-            {
-                var tellBytes = Encoding.UTF8.GetBytes(trimmed);
-                AutoTranslate.ReplaceWithPayload(ref tellBytes);
-
-                Plugin.Functions.Chat.SendTellUsingCommandInner(tellBytes);
-
-                TellSpecial = false;
-
-                activeTab.CurrentChannel.ResetTempChannel();
-                Chat = string.Empty;
-                return;
-            }
-
-            if (!trimmed.StartsWith('/'))
-            {
-                var target = activeTab.CurrentChannel.TempTellTarget ?? activeTab.CurrentChannel.TellTarget;
-                if (target != null)
-                {
-                    // ContentId 0 is a case where we can't directly send messages, so we send a /tell formatted message and let the game handle it
-                    if (target.ContentId == 0)
-                    {
-                        trimmed = $"/tell {target.ToTargetString()} {trimmed}";
-                        var tellBytes = Encoding.UTF8.GetBytes(trimmed);
-                        AutoTranslate.ReplaceWithPayload(ref tellBytes);
-
-                        ChatBox.SendMessageUnsafe(tellBytes);
-
-                        activeTab.CurrentChannel.ResetTempChannel();
-                        Chat = string.Empty;
-                        return;
-                    }
-
-                    var reason = target.Reason;
-                    var world = Sheets.WorldSheet.GetRow(target.World);
-                    if (world is { IsPublic: true })
-                    {
-                        if (reason == TellReason.Reply && GameFunctions.GameFunctions.GetFriends().Any(friend => friend.ContentId == target.ContentId))
-                            reason = TellReason.Friend;
-
-                        var tellBytes = Encoding.UTF8.GetBytes(trimmed);
-                        AutoTranslate.ReplaceWithPayload(ref tellBytes);
-
-                        Plugin.Functions.Chat.SendTell(reason, target.ContentId, target.Name, (ushort) world.RowId, tellBytes, trimmed);
-                    }
-
-                    activeTab.CurrentChannel.ResetTempChannel();
-                    Chat = string.Empty;
-                    return;
-                }
-
-                if (activeTab.CurrentChannel.UseTempChannel)
-                    trimmed = $"{activeTab.CurrentChannel.TempChannel.Prefix()} {trimmed}";
-                else
-                    trimmed = $"{activeTab.CurrentChannel.Channel.Prefix()} {trimmed}";
-            }
-
-            var bytes = Encoding.UTF8.GetBytes(trimmed);
-            AutoTranslate.ReplaceWithPayload(ref bytes);
-
-            ChatBox.SendMessageUnsafe(bytes);
+            activeTab.CurrentChannel.ResetTempChannel();
+            Chat = string.Empty;
+            return;
         }
 
-        activeTab.CurrentChannel.ResetTempChannel();
+        var originalText = Chat.Trim();
+        AddBacklog(originalText);
+        InputBacklogIdx = -1;
+
+        var outgoingContext = CreateOutgoingContext(activeTab, originalText);
+
         Chat = string.Empty;
+        TellSpecial = false;
+        activeTab.CurrentChannel.ResetTempChannel();
+
+        _ = SendChatBoxAsync(outgoingContext);
+    }
+
+    private async Task SendChatBoxAsync(OutgoingMessageContext context)
+    {
+        var textToSend = context.OriginalText;
+
+        if (!context.IsCommand && Plugin.Config.TranslationEnabled && Plugin.Config.TranslateOutgoing)
+        {
+            try
+            {
+                textToSend = await TranslateOutgoingTextAsync(textToSend).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Warning(ex, "Outgoing translation failed, sending original text");
+                textToSend = context.OriginalText;
+            }
+        }
+
+        try
+        {
+            await Plugin.Framework.RunOnFrameworkThread(() => SendMessageToGame(textToSend, context)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "Failed to send outgoing chat message");
+        }
     }
 
     internal void UserHide()
@@ -1225,16 +1274,51 @@ public sealed class ChatLogWindow : Window
 
                 if (!string.IsNullOrWhiteSpace(message.TranslationText))
                 {
-                    ImGui.NewLine();
-                    var baseLabel = Language.ChatLog_Translated_Label;
-                    var label = string.IsNullOrWhiteSpace(message.TranslationLanguage)
-                        ? baseLabel
-                        : $"{baseLabel} ({message.TranslationLanguage})";
-                    DrawChunks(
-                        [new TextChunk(ChunkSource.Content, null, $"{label}: {message.TranslationText}") { FallbackColour = ChatType.System, Italic = true }],
-                        true,
-                        handler,
-                        lineWidth);
+                    // Find first text chunk to copy styling
+                    TextChunk? firstTextChunk = null;
+                    foreach (var chunk in message.Content)
+                    {
+                        if (chunk is TextChunk tc)
+                        {
+                            firstTextChunk = tc;
+                            break;
+                        }
+                    }
+                    
+                    // Create translation chunks with language indicator
+                    var translationChunks = new List<Chunk>();
+                    
+                    // Add language tag
+                    var langTag = string.IsNullOrWhiteSpace(message.TranslationLanguage) 
+                        ? "[TR]" 
+                        : $"[{message.TranslationLanguage}]";
+                    translationChunks.Add(new TextChunk(ChunkSource.Content, null, $"{langTag} ")
+                    {
+                        FallbackColour = ChatType.System,
+                        Italic = false
+                    });
+                    
+                    // Add translated text with original styling
+                    if (firstTextChunk != null)
+                    {
+                        translationChunks.Add(new TextChunk(ChunkSource.Content, null, message.TranslationText)
+                        {
+                            Foreground = firstTextChunk.Foreground,
+                            Glow = firstTextChunk.Glow,
+                            FallbackColour = firstTextChunk.FallbackColour,
+                            Italic = false
+                        });
+                    }
+                    else
+                    {
+                        translationChunks.Add(new TextChunk(ChunkSource.Content, null, message.TranslationText)
+                        {
+                            FallbackColour = message.Code.Type,
+                            Italic = false
+                        });
+                    }
+                    
+                    DrawChunks(translationChunks, true, handler, lineWidth);
                 }
 
                 message.IsVisible[tab.Identifier] = ImGui.IsItemVisible();

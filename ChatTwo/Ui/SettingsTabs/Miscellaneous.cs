@@ -65,9 +65,37 @@ internal sealed class Miscellaneous(Configuration mutable) : ISettingsTab
 
         ImGui.Separator();
         ImGui.TextUnformatted("AI Translation");
-        ImGuiUtil.HelpText("Route chat text through an AI translator exposed via Dalamud IPC.");
+        ImGuiUtil.HelpText("Translate chat messages using OpenAI API or external plugin via IPC.");
 
         ImGui.Checkbox("Enable translation features", ref Mutable.TranslationEnabled);
+        
+        ImGui.Spacing();
+        ImGui.Checkbox("Use OpenAI API directly", ref Mutable.UseOpenAIDirectly);
+        ImGuiUtil.HelpText("When enabled, ChatTwo will call OpenAI API directly. Otherwise, it will use IPC.");
+        
+        if (Mutable.UseOpenAIDirectly)
+        {
+            ImGui.Indent();
+            ImGui.InputText("OpenAI API Key", ref Mutable.OpenAIApiKey, 256, ImGuiInputTextFlags.Password);
+            ImGuiUtil.HelpText("Your OpenAI API key (sk-...)");
+            
+            ImGui.InputText("OpenAI Model", ref Mutable.OpenAIModel, 64);
+            ImGuiUtil.HelpText("Model to use (e.g., gpt-4o-mini, gpt-4, gpt-3.5-turbo)");
+            
+            ImGui.InputText("OpenAI API URL", ref Mutable.OpenAIBaseUrl, 256);
+            ImGuiUtil.HelpText("API endpoint URL (default: https://api.openai.com/v1/chat/completions)");
+            ImGui.Unindent();
+            ImGui.Spacing();
+        }
+        else
+        {
+            ImGui.Indent();
+            ImGui.InputText("Translation IPC channel name", ref Mutable.TranslationIpcName, 64);
+            ImGuiUtil.HelpText("IPC must accept (string text, string sourceLanguage, string targetLanguage) and return translated text.");
+            ImGui.Unindent();
+            ImGui.Spacing();
+        }
+        
         ImGui.Checkbox("Translate incoming chat to target language", ref Mutable.TranslateIncoming);
         var incomingValid = LooksLikeLanguageTag(Mutable.TranslationIncomingLanguage);
         ImGui.InputText("Incoming target language (e.g. pt-BR)", ref Mutable.TranslationIncomingLanguage, LanguageTagMaxLength);
@@ -79,9 +107,6 @@ internal sealed class Miscellaneous(Configuration mutable) : ISettingsTab
         ImGui.InputText("Outgoing target language (e.g. en)", ref Mutable.TranslationOutgoingLanguage, LanguageTagMaxLength);
         if (!outgoingValid)
             ImGuiUtil.HelpText("Use a BCP-47 language tag such as en or pt-BR.");
-
-        ImGui.InputText("Translation IPC channel name", ref Mutable.TranslationIpcName, 64);
-        ImGuiUtil.HelpText("IPC must accept (string text, string sourceLanguage, string targetLanguage) and return translated text.");
     }
 
     private static bool LooksLikeLanguageTag(string value)

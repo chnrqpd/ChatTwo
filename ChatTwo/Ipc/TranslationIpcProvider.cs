@@ -32,13 +32,14 @@ internal sealed class TranslationIpcProvider : IDisposable
     {
         Plugin = plugin;
 
-        var ipcName = plugin.Config.TranslationIpcName?.Trim();
+        var ipcName = Plugin.Config.TranslationIpcName?.Trim();
         if (string.IsNullOrEmpty(ipcName))
             ipcName = DefaultIpcName;
 
         Http = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(6),
+            // Allow a bit more time to avoid transient gateway slowness.
+            Timeout = TimeSpan.FromSeconds(15),
         };
 
         ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");

@@ -258,6 +258,7 @@ internal class MessageManager : IAsyncDisposable
         var contentChunks = ChunkUtil.ToChunks(pendingMessage.Content, ChunkSource.Content, chatCode.Type).ToList();
         var message = new Message(CurrentContentId, pendingMessage.ContentId, pendingMessage.AccountId, chatCode, senderChunks, contentChunks, pendingMessage.Sender, pendingMessage.Content);
 
+        Plugin.Log.Debug($"Processing message: '{message.ContentSource.TextValue}'");
         Plugin.Translation.TranslateIncoming(message);
 
         if (Plugin.Config.DatabaseBattleMessages || !message.Code.IsBattle())

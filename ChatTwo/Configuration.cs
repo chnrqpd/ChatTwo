@@ -84,6 +84,12 @@ internal class Configuration : IPluginConfiguration
     public bool TranslateOutgoing;
     public string TranslationOutgoingLanguage = "en";
     public string TranslationIpcName = "ChatTwo.TranslateText";
+    
+    // OpenAI Direct Translation Settings
+    public bool UseOpenAIDirectly;
+    public string OpenAIApiKey = "";
+    public string OpenAIModel = "gpt-4o-mini";
+    public string OpenAIBaseUrl = "https://api.openai.com/v1/chat/completions";
 
     public bool ShowEmotes = true;
     public HashSet<string> BlockedEmotes = [];
@@ -181,6 +187,10 @@ internal class Configuration : IPluginConfiguration
         TranslateOutgoing = other.TranslateOutgoing;
         TranslationOutgoingLanguage = other.TranslationOutgoingLanguage;
         TranslationIpcName = other.TranslationIpcName;
+        UseOpenAIDirectly = other.UseOpenAIDirectly;
+        OpenAIApiKey = other.OpenAIApiKey;
+        OpenAIModel = other.OpenAIModel;
+        OpenAIBaseUrl = other.OpenAIBaseUrl;
         ShowEmotes = other.ShowEmotes;
         BlockedEmotes = other.BlockedEmotes;
         FontsEnabled = other.FontsEnabled;
@@ -388,6 +398,22 @@ internal class Tab
             {
                 Messages.Clear();
                 TrackedMessageIds.Clear();
+            }
+            finally
+            {
+                LockSlim.Release();
+            }
+        }
+        
+        public void Remove(Guid messageId)
+        {
+            LockSlim.Wait(-1);
+            try
+            {
+                if (TrackedMessageIds.Remove(messageId))
+                {
+                    Messages.RemoveAll(m => m.Id == messageId);
+                }
             }
             finally
             {
