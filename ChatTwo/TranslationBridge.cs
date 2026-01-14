@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using ChatTwo.Code;
 using Dalamud.Plugin.Ipc;
 
 namespace ChatTwo;
@@ -12,6 +13,43 @@ internal sealed class TranslationBridge
     private readonly Plugin Plugin;
     private ICallGateSubscriber<string, string, string, string?>? TranslateSubscriber;
     private string? CachedIpcName;
+    private static readonly HashSet<ChatType> TranslatableChatTypes = new()
+    {
+        ChatType.Say,
+        ChatType.Shout,
+        ChatType.Yell,
+        ChatType.TellIncoming,
+        ChatType.TellOutgoing,
+        ChatType.Party,
+        ChatType.CrossParty,
+        ChatType.Alliance,
+        ChatType.FreeCompany,
+        ChatType.PvpTeam,
+        ChatType.NoviceNetwork,
+        ChatType.CrossLinkshell1,
+        ChatType.CrossLinkshell2,
+        ChatType.CrossLinkshell3,
+        ChatType.CrossLinkshell4,
+        ChatType.CrossLinkshell5,
+        ChatType.CrossLinkshell6,
+        ChatType.CrossLinkshell7,
+        ChatType.CrossLinkshell8,
+        ChatType.Linkshell1,
+        ChatType.Linkshell2,
+        ChatType.Linkshell3,
+        ChatType.Linkshell4,
+        ChatType.Linkshell5,
+        ChatType.Linkshell6,
+        ChatType.Linkshell7,
+        ChatType.Linkshell8,
+        ChatType.GmSay,
+        ChatType.GmShout,
+        ChatType.GmYell,
+        ChatType.GmTell,
+        ChatType.GmParty,
+        ChatType.GmFreeCompany,
+        ChatType.GmNoviceNetwork,
+    };
     private static readonly HttpClient HttpClient = new();
 
     internal TranslationBridge(Plugin plugin)
@@ -50,6 +88,11 @@ internal sealed class TranslationBridge
 
         var uiLanguage = Plugin.Interface.UiLanguage;
         return ToBcp47(uiLanguage);
+    }
+
+    internal bool IsTranslatableChatType(ChatType type)
+    {
+        return TranslatableChatTypes.Contains(type);
     }
 
     private ICallGateSubscriber<string, string, string, string?>? GetSubscriber()
@@ -195,6 +238,9 @@ internal sealed class TranslationBridge
 
     internal void TranslateIncoming(Message message)
     {
+        if (!IsTranslatableChatType(message.Code.Type))
+            return;
+
         if (!Plugin.Config.TranslationEnabled || !Plugin.Config.TranslateIncoming)
         {
             Plugin.Log.Debug($"Translation skipped - Enabled: {Plugin.Config.TranslationEnabled}, TranslateIncoming: {Plugin.Config.TranslateIncoming}");
@@ -233,8 +279,11 @@ internal sealed class TranslationBridge
         });
     }
 
-    internal async Task<string> TranslateOutgoingAsync(string text)
+    internal async Task<string> TranslateOutgoingAsync(string text, ChatType chatType)
     {
+        if (!IsTranslatableChatType(chatType))
+            return text;
+
         if (!Plugin.Config.TranslationEnabled || !Plugin.Config.TranslateOutgoing)
         {
             Plugin.Log.Info("Translation disabled in config");

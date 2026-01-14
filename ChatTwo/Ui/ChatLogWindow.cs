@@ -949,10 +949,22 @@ public sealed class ChatLogWindow : Window
             activeTab.CurrentChannel.TempTellTarget);
     }
 
-    private async Task<string> TranslateOutgoingTextAsync(string text)
+    private ChatType ResolveOutgoingChatType(OutgoingMessageContext context)
+    {
+        if (context.TellSpecial || context.TellTarget != null || context.TempTellTarget != null)
+            return ChatType.TellOutgoing;
+
+        var channel = context.UseTempChannel && context.TempChannel.IsValid()
+            ? context.TempChannel
+            : context.Channel;
+
+        return channel.ToChatType();
+    }
+
+    private async Task<string> TranslateOutgoingTextAsync(string text, ChatType chatType)
     {
         Plugin.Log.Info($"TranslateOutgoingText called with: '{text}'");
-        var result = await Plugin.Translation.TranslateOutgoingAsync(text).ConfigureAwait(false);
+        var result = await Plugin.Translation.TranslateOutgoingAsync(text, chatType).ConfigureAwait(false);
         Plugin.Log.Info($"TranslateOutgoingText result: '{result}'");
         return result;
     }
@@ -1036,7 +1048,8 @@ public sealed class ChatLogWindow : Window
         {
             try
             {
-                textToSend = await TranslateOutgoingTextAsync(textToSend).ConfigureAwait(false);
+                var chatType = ResolveOutgoingChatType(context);
+                textToSend = await TranslateOutgoingTextAsync(textToSend, chatType).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
