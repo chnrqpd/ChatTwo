@@ -201,12 +201,10 @@ internal sealed class TranslationBridge
                         "- 'boss' = chefe/boss\n" +
                         "- 'tank/healer/DPS' = keep in English\n" +
                         "- 'loot/drop' = loot/drop (gaming terms)\n" +
-                        "- Translate naturally, not literally; prefer casual tone (avoid formal/polite register)\n" +
-                        "- Prefer gamer/MMO phrasing and slang; keep common abbreviations (strat, cd, aoe, dps, pull, wipe, aggro)\n" +
-                        "- Keep contractions when they exist (e.g., don't, can't, isn't) to stay conversational\n" +
+                        "- Translate naturally, not literally\n" +
                         "- If the text is emoji, punctuation, or a short particle (e.g., '.', '..', '...'), return it unchanged\n" +
                         "- Normalize repeated letters (noooo → não)\n" +
-                        "- Preserve tone and emotion; keep playful/banter vibe when present\n" +
+                        "- Preserve tone and emotion\n" +
                         "- Only output translation, nothing else\n\n" +
                         $"Text: {text}";
             
