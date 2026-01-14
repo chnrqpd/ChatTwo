@@ -961,6 +961,93 @@ public sealed class ChatLogWindow : Window
         return channel.ToChatType();
     }
 
+    private static bool TryExtractChannelCommand(string text, out string commandPrefix, out ChatType chatType, out string body)
+    {
+        commandPrefix = string.Empty;
+        body = string.Empty;
+        chatType = default;
+
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        var trimmed = text.TrimStart();
+        if (!trimmed.StartsWith('/'))
+            return false;
+
+        var spaceIndex = trimmed.IndexOf(' ');
+        if (spaceIndex < 0)
+            return false;
+
+        commandPrefix = trimmed[..spaceIndex];
+        body = trimmed[(spaceIndex + 1)..];
+
+        var token = trimmed[1..spaceIndex].ToLowerInvariant();
+
+        static bool TryParseIndexedChannel(string token, string prefix, ChatType baseType, int maxIndex, out ChatType parsed)
+        {
+            parsed = default;
+            if (!token.StartsWith(prefix, StringComparison.Ordinal))
+                return false;
+
+            var suffix = token[prefix.Length..];
+            if (!int.TryParse(suffix, out var idx))
+                return false;
+
+            if (idx < 1 || idx > maxIndex)
+                return false;
+
+            parsed = (ChatType)((int)baseType + (idx - 1));
+            return true;
+        }
+
+        switch (token)
+        {
+            case "s":
+            case "say":
+                chatType = ChatType.Say;
+                return true;
+            case "sh":
+            case "shout":
+                chatType = ChatType.Shout;
+                return true;
+            case "y":
+            case "yell":
+                chatType = ChatType.Yell;
+                return true;
+            case "p":
+            case "party":
+                chatType = ChatType.Party;
+                return true;
+            case "a":
+            case "alliance":
+                chatType = ChatType.Alliance;
+                return true;
+            case "fc":
+            case "freecompany":
+                chatType = ChatType.FreeCompany;
+                return true;
+            case "b":
+            case "beginner":
+                chatType = ChatType.NoviceNetwork;
+                return true;
+            case "pt":
+            case "pvp":
+            case "pvpteam":
+                chatType = ChatType.PvpTeam;
+                return true;
+        }
+
+        if (TryParseIndexedChannel(token, "cwls", ChatType.CrossLinkshell1, 8, out chatType) ||
+            TryParseIndexedChannel(token, "cwlinkshell", ChatType.CrossLinkshell1, 8, out chatType))
+            return true;
+
+        if (TryParseIndexedChannel(token, "ls", ChatType.Linkshell1, 8, out chatType) ||
+            TryParseIndexedChannel(token, "linkshell", ChatType.Linkshell1, 8, out chatType))
+            return true;
+
+        return false;
+    }
+
     private async Task<string> TranslateOutgoingTextAsync(string text, ChatType chatType)
     {
         Plugin.Log.Info($"TranslateOutgoingText called with: '{text}'");
@@ -1044,12 +1131,20 @@ public sealed class ChatLogWindow : Window
     {
         var textToSend = context.OriginalText;
 
-        if (!context.IsCommand && Plugin.Config.TranslationEnabled && Plugin.Config.TranslateOutgoing)
+        if (Plugin.Config.TranslationEnabled && Plugin.Config.TranslateOutgoing)
         {
             try
             {
-                var chatType = ResolveOutgoingChatType(context);
-                textToSend = await TranslateOutgoingTextAsync(textToSend, chatType).ConfigureAwait(false);
+                if (!context.IsCommand)
+                {
+                    var chatType = ResolveOutgoingChatType(context);
+                    textToSend = await TranslateOutgoingTextAsync(textToSend, chatType).ConfigureAwait(false);
+                }
+                else if (TryExtractChannelCommand(textToSend, out var commandPrefix, out var chatType, out var body) && !string.IsNullOrWhiteSpace(body))
+                {
+                    var translatedBody = await TranslateOutgoingTextAsync(body, chatType).ConfigureAwait(false);
+                    textToSend = $"{commandPrefix} {translatedBody}";
+                }
             }
             catch (Exception ex)
             {

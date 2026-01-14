@@ -65,6 +65,25 @@ internal sealed class TranslationBridge
         return text[0] is '/' or '!';
     }
 
+    private static bool ShouldSkipLowContent(string text)
+    {
+        var trimmed = text.Trim();
+        if (trimmed.Length == 0)
+            return true;
+
+        var letterOrDigitCount = 0;
+        foreach (var ch in trimmed)
+        {
+            if (char.IsLetterOrDigit(ch))
+                letterOrDigitCount++;
+        }
+
+        if (letterOrDigitCount == 0)
+            return true;
+
+        return letterOrDigitCount == 1 && trimmed.Length <= 3;
+    }
+
     private static string ToBcp47(string language)
     {
         if (string.IsNullOrWhiteSpace(language))
@@ -183,6 +202,7 @@ internal sealed class TranslationBridge
                         "- 'tank/healer/DPS' = keep in English\n" +
                         "- 'loot/drop' = loot/drop (gaming terms)\n" +
                         "- Translate naturally, not literally\n" +
+                        "- If the text is emoji, punctuation, or a short particle (e.g., '.', '..', '...'), return it unchanged\n" +
                         "- Normalize repeated letters (noooo → não)\n" +
                         "- Preserve tone and emotion\n" +
                         "- Only output translation, nothing else\n\n" +
@@ -254,6 +274,12 @@ internal sealed class TranslationBridge
             return;
         }
 
+        if (ShouldSkipLowContent(text))
+        {
+            Plugin.Log.Debug("Translation skipped - low content/emoji-like input");
+            return;
+        }
+
         var target = ResolveIncomingLanguage();
         Plugin.Log.Debug($"Starting translation for text: '{text}' to language: '{target}'");
 
@@ -293,6 +319,12 @@ internal sealed class TranslationBridge
         if (IsLikelyCommand(text))
         {
             Plugin.Log.Info($"Skipping translation for command: {text}");
+            return text;
+        }
+
+        if (ShouldSkipLowContent(text))
+        {
+            Plugin.Log.Debug("Skipping translation for low-content/emoji-like text");
             return text;
         }
 
